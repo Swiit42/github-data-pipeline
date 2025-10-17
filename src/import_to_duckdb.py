@@ -10,58 +10,26 @@ from typing import Optional
 import duckdb
 
 
-YELLOW_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS yellow_taxi_trips (
-    VendorID BIGINT,
-    tpep_pickup_datetime TIMESTAMP,
-    tpep_dropoff_datetime TIMESTAMP,
-    passenger_count DOUBLE,
-    trip_distance DOUBLE,
-    RatecodeID DOUBLE,
-    store_and_fwd_flag VARCHAR,
-    PULocationID BIGINT,
-    DOLocationID BIGINT,
-    payment_type BIGINT,
-    fare_amount DOUBLE,
-    extra DOUBLE,
-    mta_tax DOUBLE,
-    tip_amount DOUBLE,
-    tolls_amount DOUBLE,
-    improvement_surcharge DOUBLE,
-    total_amount DOUBLE,
-    congestion_surcharge DOUBLE,
-    Airport_fee DOUBLE
-);
-"""
-
-IMPORT_LOG_SQL = """
-CREATE TABLE IF NOT EXISTS import_log (
-    file_name VARCHAR PRIMARY KEY,
-    import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    rows_imported BIGINT
-);
-"""
-
 
 class DuckDBImporter:
     def __init__(self, db_path: Path | str):
         self.db_path = Path(db_path)
         self.conn = duckdb.connect(str(self.db_path))
-        self._initialize_database()
+        self.conn =self._initialize_database()
 
     def _initialize_database(self) -> None:
         # Schéma de base + table de log
-        self.conn.execute(YELLOW_SCHEMA_SQL)
-        self.conn.execute(IMPORT_LOG_SQL)
+        conn = duckdb.connect(str(self.db_path))
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS import_log (
+                file_name TEXT PRIMARY KEY,
+                import_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                rows_imported INTEGER )
+                     """)
+    
+        return conn
 
-        # 🔧 Migration souple pour millésimes récents (TLC 2025+)
-        # Ajoute la colonne si absente pour accepter les fichiers contenant cbd_congestion_fee
-        self.conn.execute("""
-            ALTER TABLE yellow_taxi_trips
-            ADD COLUMN IF NOT EXISTS cbd_congestion_fee DOUBLE;
-        """)
-
-    # ---------- Anti-doublon ----------
+   # ---------- Anti-doublon ----------
     def is_file_imported(self, filename: str) -> bool:
         row = self.conn.execute(
             "SELECT 1 FROM import_log WHERE file_name = ? LIMIT 1;", [filename]
@@ -69,46 +37,50 @@ class DuckDBImporter:
         return row is not None
 
     # ---------- Import d'un fichier ----------
-    def import_parquet(self, file_path: Path) -> bool:
-        file_path = Path(file_path)
-        fname = file_path.name
+    def create_table_from_parquet(self, parquet_path: Path) -> None:
+        query = f"""
+        CREATE TABLE IF NOT EXISTS yellow_taxi_trips AS
+        SELECT * FROM read_parquet('{parquet_path}')
+        LIMIT 0;
+        """
 
-        if self.is_file_imported(fname):
-            print(f"[SKIP] {fname} déjà importé (import_log).")
-            return True
+        self.conn.execute(query)
+        print(f"[INFO] Table 'yellow_taxi_trips' créée (si inexistante).")
 
-        before = self.conn.execute("SELECT COUNT(*) FROM yellow_taxi_trips;").fetchone()[0]
+    
+    def import_parquet(self, parquet_path: Path) -> int:
+        parquet_path = Path(parquet_path)
+        if not parquet_path.is_file():
+            print(f"[ERROR] Fichier non trouvé: {parquet_path}")
+            return 0
 
-        try:
-            self.conn.execute("BEGIN;")
-            # Aligne par nom et remplit NULL pour les colonnes manquantes
-            self.conn.execute(
-                "INSERT INTO yellow_taxi_trips BY NAME SELECT * FROM read_parquet(?);",
-                [str(file_path)],
-            )
-            self.conn.execute("COMMIT;")
-        except Exception as e:
-            self.conn.execute("ROLLBACK;")
-            print(f"[ERR ] Échec import {fname}: {e}")
-            return False
+        if self.is_file_imported(parquet_path.name):
+            print(f"[SKIP] Fichier déjà importé (log): {parquet_path.name}")
+            return 0
 
-        after = self.conn.execute("SELECT COUNT(*) FROM yellow_taxi_trips;").fetchone()[0]
-        rows_imported = int(after - before)
+        # Crée la table si elle n'existe pas encore
+        self.create_table_from_parquet(parquet_path)
 
+        # Importation des données
+        import_query = f"""
+        INSERT INTO yellow_taxi_trips
+        SELECT * FROM read_parquet('{parquet_path}');
+        """
+        self.conn.execute(import_query)
+
+        # Nombre de lignes importées
+        rows_imported = self.conn.execute(
+            "SELECT COUNT(*) FROM yellow_taxi_trips WHERE TRUE;"
+        ).fetchone()[0]
+
+        # Log de l'importation
         self.conn.execute(
-            "INSERT INTO import_log(file_name, import_date, rows_imported) VALUES (?, CURRENT_TIMESTAMP, ?);",
-            [fname, rows_imported],
+            "INSERT INTO import_log (file_name, rows_imported) VALUES (?, ?);",
+            (parquet_path.name, rows_imported),
         )
 
-        print(f"[OK  ] {fname} -> {rows_imported} lignes")
-        return True
-
-        # 💡 Alternative si tu veux ignorer explicitement la colonne au lieu de modifier le schéma :
-        # self.conn.execute(
-        #     "INSERT INTO yellow_taxi_trips BY NAME "
-        #     "SELECT * EXCLUDE (cbd_congestion_fee) FROM read_parquet(?);",
-        #     [str(file_path)],
-        # )
+        print(f"[IMPORT] {parquet_path.name} importé avec {rows_imported} lignes.")
+        return rows_imported
 
     # ---------- Import batch ----------
     def import_all_parquet_files(self, data_dir: Path) -> int:
