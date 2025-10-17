@@ -24,7 +24,10 @@ requires-python = ">=3.13"
 # Liste des dépendances nécessaires au fonctionnement du package
 # Format: "nom-package>=version-minimale"
 dependencies = [
+    "fastparquet>=2024.11.0",
     "pandas>=2.3.3",
+    "pyarrow>=21.0.0",
+    "requests>=2.32.5",
 ]
 
 # =============================================================================
