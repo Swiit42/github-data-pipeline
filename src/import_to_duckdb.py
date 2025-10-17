@@ -1,3 +1,4 @@
+# src/import_to_duckdb.py
 from __future__ import annotations
 
 import argparse
@@ -45,14 +46,20 @@ CREATE TABLE IF NOT EXISTS import_log (
 class DuckDBImporter:
     def __init__(self, db_path: Path | str):
         self.db_path = Path(db_path)
-        # Connexion
         self.conn = duckdb.connect(str(self.db_path))
-        # Intégrité (journal WAL activé par défaut en 0.10)
         self._initialize_database()
 
     def _initialize_database(self) -> None:
+        # Schéma de base + table de log
         self.conn.execute(YELLOW_SCHEMA_SQL)
         self.conn.execute(IMPORT_LOG_SQL)
+
+        # 🔧 Migration souple pour millésimes récents (TLC 2025+)
+        # Ajoute la colonne si absente pour accepter les fichiers contenant cbd_congestion_fee
+        self.conn.execute("""
+            ALTER TABLE yellow_taxi_trips
+            ADD COLUMN IF NOT EXISTS cbd_congestion_fee DOUBLE;
+        """)
 
     # ---------- Anti-doublon ----------
     def is_file_imported(self, filename: str) -> bool:
@@ -70,18 +77,15 @@ class DuckDBImporter:
             print(f"[SKIP] {fname} déjà importé (import_log).")
             return True
 
-        # Compte initial
         before = self.conn.execute("SELECT COUNT(*) FROM yellow_taxi_trips;").fetchone()[0]
 
-        # Transaction pour une importation atomique
         try:
             self.conn.execute("BEGIN;")
-            # Astuce DuckDB: BY NAME aligne les colonnes par nom et ignore les colonnes en plus.
+            # Aligne par nom et remplit NULL pour les colonnes manquantes
             self.conn.execute(
                 "INSERT INTO yellow_taxi_trips BY NAME SELECT * FROM read_parquet(?);",
                 [str(file_path)],
             )
-            # Commit
             self.conn.execute("COMMIT;")
         except Exception as e:
             self.conn.execute("ROLLBACK;")
@@ -91,7 +95,6 @@ class DuckDBImporter:
         after = self.conn.execute("SELECT COUNT(*) FROM yellow_taxi_trips;").fetchone()[0]
         rows_imported = int(after - before)
 
-        # Log d'import (même si 0 lignes, on note le passage pour ne pas retenter)
         self.conn.execute(
             "INSERT INTO import_log(file_name, import_date, rows_imported) VALUES (?, CURRENT_TIMESTAMP, ?);",
             [fname, rows_imported],
@@ -99,6 +102,13 @@ class DuckDBImporter:
 
         print(f"[OK  ] {fname} -> {rows_imported} lignes")
         return True
+
+        # 💡 Alternative si tu veux ignorer explicitement la colonne au lieu de modifier le schéma :
+        # self.conn.execute(
+        #     "INSERT INTO yellow_taxi_trips BY NAME "
+        #     "SELECT * EXCLUDE (cbd_congestion_fee) FROM read_parquet(?);",
+        #     [str(file_path)],
+        # )
 
     # ---------- Import batch ----------
     def import_all_parquet_files(self, data_dir: Path) -> int:
@@ -121,18 +131,14 @@ class DuckDBImporter:
         total = self.conn.execute("SELECT COUNT(*) FROM yellow_taxi_trips;").fetchone()[0]
         nb_files = self.conn.execute("SELECT COUNT(*) FROM import_log;").fetchone()[0]
 
-        # Min/Max sur la colonne pickup
-        # (si table vide, fetchone() renvoie (None, None))
-        min_max = self.conn.execute(
+        min_dt, max_dt = self.conn.execute(
             "SELECT MIN(tpep_pickup_datetime), MAX(tpep_pickup_datetime) FROM yellow_taxi_trips;"
         ).fetchone()
-        min_dt, max_dt = min_max if min_max else (None, None)
 
-        db_size_bytes: Optional[int] = None
         try:
-            db_size_bytes = os.path.getsize(self.db_path)
+            db_size_bytes: Optional[int] = os.path.getsize(self.db_path)
         except OSError:
-            pass
+            db_size_bytes = None
 
         def _fmt_size(n: Optional[int]) -> str:
             if n is None:
@@ -156,29 +162,29 @@ class DuckDBImporter:
 
 
 def main():
-        parser = argparse.ArgumentParser(description="Importe des fichiers Parquet Yellow Taxi dans DuckDB.")
-        parser.add_argument(
-            "--db",
-            type=Path,
-            default=Path("data/warehouse/yellow_taxi.duckdb"),
-            help="Chemin du fichier DuckDB (.duckdb)",
-        )
-        parser.add_argument(
-            "--data-dir",
-            type=Path,
-            default=Path("data/raw"),
-            help="Dossier contenant les .parquet (ex: data/raw)",
-        )
-        args = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Importe des fichiers Parquet Yellow Taxi dans DuckDB.")
+    parser.add_argument(
+        "--db",
+        type=Path,
+        default=Path("data/warehouse/yellow_taxi.duckdb"),
+        help="Chemin du fichier DuckDB (.duckdb)",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=Path("data/raw"),
+        help="Dossier contenant les .parquet (ex: data/raw)",
+    )
+    args = parser.parse_args()
 
-        args.db.parent.mkdir(parents=True, exist_ok=True)
+    args.db.parent.mkdir(parents=True, exist_ok=True)
 
-        importer = DuckDBImporter(db_path=args.db)
-        try:
-            importer.import_all_parquet_files(args.data_dir)
-            importer.get_statistics()
-        finally:
-            importer.close()
+    importer = DuckDBImporter(db_path=args.db)
+    try:
+        importer.import_all_parquet_files(args.data_dir)
+        importer.get_statistics()
+    finally:
+        importer.close()
 
 
 if __name__ == "__main__":
