@@ -1,0 +1,149 @@
+# =============================================================================
+# MÉTADONNÉES DU PROJET
+# =============================================================================
+# Cette section contient les informations de base sur votre package Python
+[project]
+# Nom du package tel qu'il apparaîtra sur PyPI et pour 'pip install'
+name = "semantic-release"
+
+# Version actuelle du package - ATTENTION: Cette valeur est automatiquement
+# mise à jour par semantic-release lors d'un release. Ne la modifiez pas manuellement.
+
+version = "2.0.0-rc.1"
+
+# Description courte qui apparaît dans les métadonnées du package
+description = "Semantic release for Python packages"
+
+# Fichier README qui sera affiché sur PyPI
+# IMPORTANT: Ce fichier doit exister et le nom est case-sensitive (README.md, pas Readme.md)
+readme = "README.md"
+
+# Version minimale de Python requise pour utiliser ce package
+requires-python = ">=3.13"
+
+# Liste des dépendances nécessaires au fonctionnement du package
+# Format: "nom-package>=version-minimale"
+dependencies = [
+    "pandas>=2.3.3",
+]
+
+# =============================================================================
+# URLs DU PROJET
+# =============================================================================
+# URLs qui apparaissent dans les métadonnées du package (sur PyPI, etc.)
+[project.urls]
+Repository = "https://github.com/gsoulat/semantic-release-uv"
+# Vous pouvez ajouter d'autres URLs comme:
+# Documentation = "https://..."
+# "Bug Tracker" = "https://..."
+# Changelog = "https://..."
+
+# =============================================================================
+# CONFIGURATION DU SYSTÈME DE BUILD
+# =============================================================================
+# Définit quel outil est utilisé pour construire le package
+[build-system]
+# Backend de build utilisé - Hatchling est moderne et rapide
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# =============================================================================
+# CONFIGURATION HATCHLING - LOCALISATION DES FICHIERS
+# =============================================================================
+# Indique à hatchling où trouver le code source du package
+# NÉCESSAIRE car notre package est dans src/ et non à la racine
+# Sans cette configuration, hatchling ne sait pas quels fichiers inclure dans le wheel
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+# =============================================================================
+# SEMANTIC RELEASE - CONFIGURATION PRINCIPALE
+# =============================================================================
+# Semantic Release automatise la gestion des versions basée sur les commits
+[tool.semantic_release]
+
+# Où semantic-release doit lire/écrire la version du projet
+# Format: "fichier:chemin.vers.la.version"
+# Ici, il mettra à jour la ligne 'version' dans [project]
+version_toml = ["pyproject.toml:project.version"]
+
+# Commande exécutée lors de la création d'un release
+# Cette commande est exécutée APRÈS la mise à jour de la version
+build_command = """
+uv lock --upgrade-package semantic-release-python-uv
+git add uv.lock
+uv build
+"""
+# Détail des étapes:
+# 1. uv lock --upgrade-package: Met à jour uv.lock avec la nouvelle version
+# 2. git add uv.lock: Stage uv.lock pour l'inclure dans le commit de release
+# 3. uv build: Construit les distributions (.tar.gz et .whl)
+
+# Si false, les versions 0.x.x ne passeront jamais automatiquement à 1.0.0
+# Utile pour les projets en développement initial
+major_on_zero = false
+
+# Si true, publie automatiquement le package sur PyPI lors d'un release
+upload_to_pypi = false
+
+# Si true, crée une GitHub Release et y attache les artifacts de build
+upload_to_release = true
+
+# =============================================================================
+# SEMANTIC RELEASE - CONFIGURATION DES BRANCHES
+# =============================================================================
+# Définit comment chaque branche gère les releases
+
+# BRANCHE MAIN - Versions stables (production)
+[tool.semantic_release.branches.main]
+match = "main"                    # Nom de la branche à matcher
+prerelease = false                # false = versions stables (1.0.0, 1.1.0, 2.0.0)
+# Exemples de versions créées sur main: 1.0.0, 1.1.0, 1.2.0, 2.0.0
+
+# BRANCHE DEVELOP - Versions de pré-release (RC = Release Candidate)
+[tool.semantic_release.branches.develop]
+match = "develop"                 # Nom de la branche à matcher
+prerelease = true                 # true = versions avec suffixe
+# prerelease_token = "rc"           # Suffixe utilisé pour les pré-releases
+# Exemples de versions créées sur develop: 1.0.0-rc.1, 1.0.0-rc.2, 1.1.0-rc.1
+
+# =============================================================================
+# SEMANTIC RELEASE - ANALYSE DES COMMITS
+# =============================================================================
+# Configure comment semantic-release analyse vos commits pour déterminer
+# le type de release (major, minor, patch)
+[tool.semantic_release.commit_parser_options]
+
+# Liste de tous les types de commits acceptés (Conventional Commits)
+allowed_tags = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "chore", "ci", "build"]
+
+# Commits qui déclenchent une version MINEURE (0.1.0 → 0.2.0)
+# Exemple: "feat: add new authentication system"
+minor_tags = ["feat"]
+
+# Commits qui déclenchent une version PATCH (0.1.0 → 0.1.1)
+# Exemple: "fix: correct login bug"
+patch_tags = ["fix", "perf"]
+
+# NOTES sur le versioning:
+# - MAJOR (0.1.0 → 1.0.0): Commit avec "BREAKING CHANGE:" dans le corps
+# - MINOR (0.1.0 → 0.2.0): Commits avec tags listés dans minor_tags
+# - PATCH (0.1.0 → 0.1.1): Commits avec tags listés dans patch_tags
+# - Autres commits (docs, style, etc.): Ne déclenchent PAS de nouvelle version
+
+# =============================================================================
+# SEMANTIC RELEASE - GÉNÉRATION DU CHANGELOG
+# =============================================================================
+# Configure la génération automatique du fichier CHANGELOG.md
+[tool.semantic_release.changelog]
+
+# Patterns de commits à exclure du changelog (regex)
+# Exemple: ["^chore:", "^ci:"] exclurait tous les commits chore et ci
+exclude_commit_patterns = []
+
+# Configuration du template de changelog par défaut
+# NOUVELLE SYNTAXE (v9+): changelog_file a été déplacé ici
+[tool.semantic_release.changelog.default_templates]
+# Nom du fichier où écrire le changelog
+# Le changelog est généré automatiquement à partir des commits
+changelog_file = "CHANGELOG.md"
