@@ -1,18 +1,21 @@
+# docker-compose.yml
 version: "3.9"
-
 services:
   postgres:
     image: postgres:16
-    container_name: postgres_db
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: mydatabase
+    env_file:
+      - .env
     ports:
       - "15432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
+  importer:
+    build: .
+    env_file:
+      - .env
+    command: bash -c "python src/import_to_postgres.py --data-dir src/data/raw"
+    depends_on:
+      - postgres
 
 volumes:
-  postgres_data:
+  pg_data:
