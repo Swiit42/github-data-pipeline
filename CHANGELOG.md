@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.0 (2025-10-17)
+
+### Features
+
+- Add NYC taxi data downloader with duplicate prevention
+  ([`120a14f`](https://github.com/Swiit42/github-data-pipeline/commit/120a14f2dc64acbddfff0231d262defd212300dc))
+
+
 ## v1.0.0 (2025-10-17)
 
 - Initial Release
