@@ -1,0 +1,11 @@
+duckdb
+pandas
+sqlmodel
+psycopg2-binary
+python-dotenv
+requests
+tqdm
+fastapi
+uvicorn
+pydantic
+pydantic-settings
