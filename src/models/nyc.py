@@ -1,5 +1,0 @@
-
-
-class nyc():
-    id : int
-    
