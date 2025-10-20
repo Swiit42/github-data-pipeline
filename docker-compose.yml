@@ -1,21 +1,65 @@
-# docker-compose.yml
-version: "3.9"
+# version: "3.9"
+
+# services:
+#   postgres:
+#     image: postgres:16
+#     env_file: [.env]
+#     ports:
+#       - "15432:5432"
+#     volumes:
+#       - pg_data:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+#       interval: 5s
+#       timeout: 5s
+#       retries: 10
+
+#   importer:
+#     build: .
+#     env_file: [.env]
+#     depends_on:
+#       postgres:
+#         condition: service_healthy
+#     volumes:
+#       - ./src/data/raw:/app/src/data/raw
+#     command: >
+#       bash -c "uv run python -u src/import_to_postgres.py --data-dir src/data/raw"
+
+# volumes:
+#   pg_data:
 services:
   postgres:
     image: postgres:16
-    env_file:
-      - .env
+    env_file: [.env]
     ports:
       - "15432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   importer:
     build: .
-    env_file:
-      - .env
-    command: bash -c "python src/import_to_postgres.py --data-dir src/data/raw"
+    env_file: [.env]
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./src/data/raw:/app/src/data/raw:ro
+      - ./src:/app/src:ro
+    environment:
+      PYTHONUNBUFFERED: "1"
+    command: >
+      python -u src/import_to_postgres.py
+      --data-dir src/data/raw
+      --batch-rows 250000
+      --to-sql-chunksize 50000
+    restart: "no"  # il s'arrête quand l'import est fini
 
 volumes:
   pg_data:
+

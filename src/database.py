@@ -1,4 +1,3 @@
-# src/database.py
 from __future__ import annotations
 import os
 from sqlmodel import SQLModel, create_engine, Session, Field
@@ -21,10 +20,11 @@ DATABASE_URL = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB
 engine = create_engine(DATABASE_URL, echo=False)
 
 
-
-# ========= Modèles ==========
 class YellowTaxiTrip(SQLModel, table=True):
     __tablename__ = "yellow_taxi_trips"
+
+    # PK auto (INTEGER autoincrement côté Postgres)
+    id: int | None = Field(default=None, primary_key=True)
 
     vendorid: int | None = Field(default=None)
     tpep_pickup_datetime: datetime | None = Field(default=None)
@@ -50,11 +50,9 @@ class YellowTaxiTrip(SQLModel, table=True):
 
 class ImportLog(SQLModel, table=True):
     __tablename__ = "import_log"
-
     file_name: str = Field(primary_key=True)
     import_date: datetime | None = Field(default_factory=datetime.utcnow)
     rows_imported: int | None = Field(default=None)
-
 
 # ========= Helpers ==========
 def get_db() -> Generator[Session, None, None]:
