@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0-rc.2 (2025-10-20)
+
+### Features
+
+- Fill postgres db with parquet data
+  ([`eb07e01`](https://github.com/Swiit42/github-data-pipeline/commit/eb07e01ab0c8145d327c3982cd328569b194155d))
+
+
 ## v1.2.0-rc.1 (2025-10-17)
 
 ### Features
