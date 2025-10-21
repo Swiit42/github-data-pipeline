@@ -5,9 +5,9 @@ services:
     image: postgres:16
     container_name: nyctaxi-postgres
     environment:
-      POSTGRES_DB: postgres
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nyc_taxi_clean
     ports:
       - "15432:5432"
     healthcheck:
@@ -52,5 +52,15 @@ services:
 
 volumes:
   pgdata:
-
-
+      - postgres_data:/var/lib/postgresql/data
+  mongodb:
+    image: mongo:7
+    container_name: nyc-taxi-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_DATABASE: nyc_taxi_clean
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongodb_data:/data/db
