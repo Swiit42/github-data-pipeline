@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.2.0-rc.3 (2025-10-21)
+
+### Features
+
+- Creation feature fastapi
+  ([`1168680`](https://github.com/Swiit42/github-data-pipeline/commit/1168680431f2df03063b10145d0f9e21c15e1d59))
+
+- Fastapi et endpoints OK
+  ([`c1b14d9`](https://github.com/Swiit42/github-data-pipeline/commit/c1b14d9152ec0070f4ef1dd84c17b58934f3b9e5))
+
+
 ## v1.2.0-rc.2 (2025-10-20)
 
 ### Features
