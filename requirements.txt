@@ -10,3 +10,4 @@ uvicorn
 pydantic
 pydantic-settings
 pyarrow
+dlt[postgres,parquet]==0.4.3
