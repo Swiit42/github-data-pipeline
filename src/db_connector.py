@@ -273,12 +273,12 @@ class PostgresParquetImporter:
 
 if __name__ == "__main__":
     # Lecture silencieuse des variables d'env (Docker Compose)
-    HOST = getenv("PG_HOST", "localhost")
-    DB = getenv("PG_DB", "postgres")
-    USER = getenv("PG_USER", "postgres")
-    PASSWORD = getenv("PG_PASSWORD", "postgres")
-    PORT = int(getenv("PG_PORT", "5432"))
-    DATA_DIR = Path(getenv("DATA_DIR", "data"))
+    HOST = getenv("PG_HOST")
+    DB = getenv("PG_DB")
+    USER = getenv("PG_USER")
+    PASSWORD = getenv("PG_PASSWORD")
+    PORT = int(getenv("PG_PORT"))
+    DATA_DIR = Path(getenv("DATA_DIR"))
 
     importer = PostgresParquetImporter(
         host=HOST, dbname=DB, user=USER, password=PASSWORD, port=PORT,

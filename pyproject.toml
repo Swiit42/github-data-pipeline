@@ -24,6 +24,7 @@ requires-python = ">=3.13"
 # Liste des dépendances nécessaires au fonctionnement du package
 # Format: "nom-package>=version-minimale"
 dependencies = [
+    "dlt>=1.17.1",
     "duckdb>=1.4.1",
     "fastapi>=0.119.1",
     "fastparquet>=2024.11.0",
