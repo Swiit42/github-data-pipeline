@@ -76,7 +76,7 @@ class PostgresParquetImporter:
 
     def _initialize_db(self):
         """Crée les tables si elles n'existent pas (schéma aligné CamelCase)."""
-        self.log("🧱 Creating tables if not exists…")
+        self.log("Creating tables if not exists…")
         self.cur.execute("""
         CREATE TABLE IF NOT EXISTS yellow_taxi_trips (
             id SERIAL PRIMARY KEY,
@@ -250,10 +250,10 @@ class PostgresParquetImporter:
 
         imported_count = 0
         for i, file_path in enumerate(parquet_files, 1):
-            self.log(f"➡️ [{i}/{len(parquet_files)}] {file_path}")
+            self.log(f"[{i}/{len(parquet_files)}] {file_path}")
             if self.import_parquet(file_path):
                 imported_count += 1
-        print(f"📦 Imported {imported_count}/{len(parquet_files)} parquet files.")
+        print(f"Imported {imported_count}/{len(parquet_files)} parquet files.")
         return imported_count
 
     def get_statistics(self):

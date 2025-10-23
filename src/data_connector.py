@@ -69,7 +69,7 @@ class DataConnector:
             raise ConnectionError("Connexion PostgreSQL non initialisée.")
 
         try:
-            # 1️⃣ Compter le total de lignes valides
+            #Compter le total de lignes valides
             count_query = text(f"""
                 SELECT COUNT(*) FROM {table_name}
                 WHERE passenger_count BETWEEN 1 AND 8
@@ -133,7 +133,7 @@ class DataConnector:
             - Retourne le nombre de documents insérés
             """
             if df.empty:
-                print("⚠️ DataFrame vide, rien à insérer dans MongoDB.")
+                print("DataFrame vide, rien à insérer dans MongoDB.")
                 return 0
 
             # 1Convertir les Timestamp Pandas → datetime Python
@@ -146,7 +146,7 @@ class DataConnector:
             for id_col in ["id", "ID", "uuid"]:
                 if id_col in df.columns:
                     df.drop(columns=[id_col], inplace=True)
-                    print(f"🧹 Colonne '{id_col}' supprimée avant insertion.")
+                    print(f"Colonne '{id_col}' supprimée avant insertion.")
 
             # Convertir en liste de dictionnaires
             records = df.to_dict("records")
@@ -154,9 +154,9 @@ class DataConnector:
             # Vérifier si des données existent déjà dans MongoDB
             existing_count = self.cleaned_trips.count_documents({})
             if existing_count > 0:
-                print(f"🗑️ {existing_count:,} anciens documents trouvés — suppression en cours...")
+                print(f"{existing_count:,} anciens documents trouvés — suppression en cours...")
                 self.cleaned_trips.delete_many({})
-                print("✅ Anciennes données supprimées.")
+                print("Anciennes données supprimées.")
 
             # Insertion des nouvelles données
             try:
@@ -165,7 +165,7 @@ class DataConnector:
                 print(f"{inserted_count:,} documents insérés dans MongoDB.")
                 return inserted_count
             except Exception as e:
-                print(f"❌ Erreur lors de l’insertion MongoDB : {e}")
+                print(f"Erreur lors de l’insertion MongoDB : {e}")
                 return 0
 
 if __name__ == "__main__":
