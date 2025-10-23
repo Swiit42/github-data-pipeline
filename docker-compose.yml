@@ -9,14 +9,14 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "15432:5432"
+      - "15432:5432"            # Accès DB depuis l'hôte (DBeaver/psql)
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
       timeout: 3s
-      retries: 20
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+      retries: 15
 
   api:
     build: .
@@ -26,31 +26,41 @@ services:
         condition: service_healthy
     env_file: .env
     environment:
-      DATA_DIR: /app/src/data        # ✅ nouveau chemin
+      PG_HOST: postgres         # En Docker, l'hôte est le nom du service
+      PG_PORT: 5432
+      PG_DB: postgres
+      PG_USER: postgres
+      PG_PASSWORD: postgres
+      DATA_DIR: /app/src/data   # Monte ci-dessous
       PYTHONUNBUFFERED: "1"
     volumes:
-      - .:/app                       # hot-reload et src inclus
+      - .:/app                  # hot-reload pour dev
+      - ./src/data:/app/src/data
     command: >
       sh -c "uvicorn src.api.main:app --host 0.0.0.0 --port 8000"
     ports:
-      - "8000:8000"
+      - "8000:8000"             # API: http://localhost:8000
 
-  importer:
+  dlt-runner:
     build: .
-    container_name: nyctaxi-importer
+    container_name: nyctaxi-dlt
     depends_on:
       postgres:
         condition: service_healthy
     env_file: .env
     environment:
-      DATA_DIR: /app/src/data        # ✅ même ici
-      PYTHONUNBUFFERED: "1"
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: postgres
+      PG_USER: postgres
+      PG_PASSWORD: postgres
+      DATA_DIR: /app/src/data
+    working_dir: /app
     volumes:
       - .:/app
-    command: ["python", "src/db_connector.py"]
-    restart: "no"
+      - ./src/data:/app/src/data
+    command: >
+      sh -c "python src/dlt_pipeline.py"
 
 volumes:
   pgdata:
-
-
