@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "15432:5432"
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
@@ -17,7 +17,17 @@ services:
       retries: 20
     volumes:
       - pgdata:/var/lib/postgresql/data
-
+  mongodb:
+    image: mongo:7
+    container_name: nyctaxi-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_DATABASE: nyc_taxi_clean
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongodb_data:/data/db
   api:
     build: .
     container_name: nyctaxi-api
@@ -49,8 +59,21 @@ services:
       - .:/app
     command: ["python", "src/db_connector.py"]
     restart: "no"
+  data_connector:
+    build: .
+    container_name: nyctaxi-data-connector
+    depends_on:
+      - postgres
+      - mongodb
+    env_file: .env
+    environment:
+      DATA_DIR: /app/src/data        # ✅ même ici aussi
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - .:/app
+    command: ["python", "src/data_connector.py"]
+    restart: "no"
 
 volumes:
   pgdata:
-
-
+  mongodb_data:
