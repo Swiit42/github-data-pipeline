@@ -2,12 +2,15 @@ import io
 import gc
 from pathlib import Path
 from os import getenv
+from dotenv import load_dotenv
 
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
 import pyarrow.parquet as pq
 
+import os
+load_dotenv()
 
 class PostgresParquetImporter:
     def __init__(
@@ -69,7 +72,7 @@ class PostgresParquetImporter:
         finally:
             if self.conn:
                 self.conn.close()
-                print("🔒 PostgreSQL connection closed.")
+                print("PostgreSQL connection closed.")
 
     def _initialize_db(self):
         """Crée les tables si elles n'existent pas (schéma aligné CamelCase)."""
@@ -106,7 +109,7 @@ class PostgresParquetImporter:
         );
         """)
         self.conn.commit()
-        self.log("✅ Schema ready.")
+        self.log("Schema ready.")
 
     def is_file_imported(self, file_name: str) -> bool:
         self.cur.execute("SELECT 1 FROM import_log WHERE file_name = %s;", (file_name,))
@@ -170,49 +173,49 @@ class PostgresParquetImporter:
 
     def import_parquet(self, file_path: Path) -> bool:
         file_name = file_path.name
-        self.log(f"\n📥 Start file: {file_name}")
+        self.log(f"\nStart file: {file_name}")
 
         if self.is_file_imported(file_name):
-            self.log(f"⚠️  Already imported: {file_name} — skipping.")
+            self.log(f"Already imported: {file_name} — skipping.")
             return False
 
         if not self._try_lock_file(file_name):
-            self.log(f"🔒 Locked by another process: {file_name} — skipping.")
+            self.log(f"Locked by another process: {file_name} — skipping.")
             return False
 
         total_rows = 0
         try:
             pa_file = str(file_path)
-            self.log(f"🧩 Opening ParquetFile: {pa_file}")
+            self.log(f"Opening ParquetFile: {pa_file}")
             pf = pq.ParquetFile(pa_file)
 
-            self.log(f"📦 Row groups: {pf.num_row_groups}")
+            self.log(f"Row groups: {pf.num_row_groups}")
             batch_no = 0
 
             for batch in pf.iter_batches(batch_size=self.batch_size):
                 batch_no += 1
-                self.log(f"  🔄 Batch #{batch_no} — converting to pandas …")
+                self.log(f"Batch #{batch_no} — converting to pandas …")
                 df = batch.to_pandas()
                 df = self._normalize_chunk(df)
                 if len(df) == 0:
                     continue
 
                 if self.dry_run:
-                    self.log(f"  🧪 DRY-RUN: would insert {len(df)} rows.")
+                    self.log(f"DRY-RUN: would insert {len(df)} rows.")
                 else:
                     if self.method == "copy":
                         self._copy_chunk(df)
                     else:
                         self._values_chunk(df)
                     self.conn.commit()
-                    self.log(f"  ✅ Batch #{batch_no} committed.")
+                    self.log(f"Batch #{batch_no} committed.")
 
                 total_rows += len(df)
                 del df
                 gc.collect()
 
                 if self.dry_run:
-                    self.log("  🧪 DRY-RUN: stopping after first batch.")
+                    self.log("DRY-RUN: stopping after first batch.")
                     break
 
             if not self.dry_run:
@@ -221,13 +224,13 @@ class PostgresParquetImporter:
                     (file_name, total_rows),
                 )
                 self.conn.commit()
-                self.log(f"✅ File done: {file_name} — {total_rows} rows.")
+                self.log(f"File done: {file_name} — {total_rows} rows.")
 
             return True
 
         except Exception as e:
             self.conn.rollback()
-            self.log(f"❌ Failed to import {file_name}: {e}")
+            self.log(f"Failed to import {file_name}: {e}")
             return False
 
         finally:
@@ -238,12 +241,12 @@ class PostgresParquetImporter:
 
     def import_all_parquet_files(self, data_dir: Path, recursive: bool = True) -> int:
         data_dir = Path(data_dir)
-        self.log(f"📁 Effective data_dir = {data_dir.resolve()}")
+        self.log(f"Effective data_dir = {data_dir.resolve()}")
         pattern = "**/*.parquet" if recursive else "*.parquet"
         parquet_files = sorted(data_dir.glob(pattern))
-        self.log(f"🗂️ Found {len(parquet_files)} parquet files.")
+        self.log(f"Found {len(parquet_files)} parquet files.")
         if not parquet_files:
-            print(f"ℹ️ No parquet files found in {data_dir} (recursive={recursive}).")
+            print(f"No parquet files found in {data_dir} (recursive={recursive}).")
 
         imported_count = 0
         for i, file_path in enumerate(parquet_files, 1):
@@ -273,15 +276,16 @@ class PostgresParquetImporter:
 
 if __name__ == "__main__":
     # Lecture silencieuse des variables d'env (Docker Compose)
-    HOST = getenv("PG_HOST", "localhost")
-    DB = getenv("PG_DB", "postgres")
-    USER = getenv("PG_USER", "postgres")
-    PASSWORD = getenv("PG_PASSWORD", "postgres")
-    PORT = int(getenv("PG_PORT", "5432"))
-    DATA_DIR = Path(getenv("DATA_DIR", "data"))
+    host = os.getenv("PG_HOST")
+    port = os.getenv("PG_PORT")
+    db = os.getenv("PG_DB")
+    user = os.getenv("PG_USER")
+    password = os.getenv("PG_PASSWORD")
+    DATA_DIR = Path(getenv("DATA_DIR"))
+    print("Postges connection params:", host, port, db, user, password, DATA_DIR)
 
     importer = PostgresParquetImporter(
-        host=HOST, dbname=DB, user=USER, password=PASSWORD, port=PORT,
+        host=host, dbname=db, user=user, password=password, port=port,
         batch_size=200_000, method="copy", dry_run=False, verbose=True
     )
     try:
